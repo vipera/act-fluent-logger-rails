@@ -31,9 +31,12 @@ module ActFluentLoggerRails
       if (0 == settings.length)
         fluent_config = if ENV["FLUENTD_URL"]
                           self.parse_url(ENV["FLUENTD_URL"])
-                        else
+                        elsif File.exists?(config_file)
                           YAML.load(ERB.new(config_file.read).result)[Rails.env]
+                        else
+                          {}
                         end
+
         settings = {
           tag:  fluent_config['tag'],
           host: fluent_config['fluent_host'],
@@ -86,9 +89,13 @@ module ActFluentLoggerRails
       @tag = options[:tag]
       @severity_key = (options[:severity_key] || :severity).to_sym
       @flush_immediately = options[:flush_immediately]
-      logger_opts = {host: host, port: port, nanosecond_precision: nanosecond_precision}
-      logger_opts[:tls_options] = options[:tls_options] unless options[:tls_options].nil?
-      @fluent_logger = ::Fluent::Logger::FluentLogger.new(nil, logger_opts)
+      if host && port
+        logger_opts = {host: host, port: port, nanosecond_precision: nanosecond_precision}
+        logger_opts[:tls_options] = options[:tls_options] unless options[:tls_options].nil?
+        @fluent_logger = ::Fluent::Logger::FluentLogger.new(nil, logger_opts)
+      else
+        @fluent_logger = ::Fluent::Logger::ConsoleLogger.new(STDOUT)
+      end
       @severity = 0
       @log_tags = log_tags
       after_initialize if respond_to?(:after_initialize) && Rails::VERSION::MAJOR < 6
